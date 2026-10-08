@@ -6,3 +6,6 @@ bin/
 obj/
 publish/
 *.zip
+
+SecondEcran-Windows/
+SecondEcran-Android-apk/
