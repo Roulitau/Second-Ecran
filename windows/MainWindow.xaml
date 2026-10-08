@@ -1,0 +1,91 @@
+<Window x:Class="SecondEcran.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Second écran" Width="900" Height="760" MinWidth="760" MinHeight="620"
+        Background="{StaticResource Bg}" Foreground="{StaticResource Fg}"
+        FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
+  <Grid Margin="24">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="*"/>
+    </Grid.RowDefinitions>
+
+    <!-- En-tête -->
+    <StackPanel Grid.Row="0" Margin="0,0,0,16">
+      <TextBlock Text="Second écran" FontSize="30" FontWeight="SemiBold"/>
+      <TextBlock x:Name="StatusText" Text="■ Arrêté ✕" FontSize="16" Margin="0,4,0,0"
+                 Foreground="{StaticResource Muted}"/>
+    </StackPanel>
+
+    <!-- Réglages + câble USB -->
+    <Grid Grid.Row="1">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*"/>
+        <ColumnDefinition Width="300"/>
+      </Grid.ColumnDefinitions>
+
+      <StackPanel Grid.Column="0" Margin="0,0,20,0">
+        <TextBlock Text="Écran à envoyer" Foreground="{StaticResource Muted}" Margin="0,0,0,6"/>
+        <WrapPanel x:Name="ScreensPanel"/>
+
+        <TextBlock Text="Images par seconde" Foreground="{StaticResource Muted}" Margin="0,4,0,6"/>
+        <WrapPanel x:Name="FpsPanel">
+          <RadioButton Style="{StaticResource Seg}" GroupName="fps" Tag="30" Content="30"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="fps" Tag="60" Content="60" IsChecked="True"/>
+        </WrapPanel>
+
+        <TextBlock Text="Débit app Android (Mb/s)" Foreground="{StaticResource Muted}" Margin="0,4,0,6"/>
+        <WrapPanel x:Name="BitratePanel">
+          <RadioButton Style="{StaticResource Seg}" GroupName="br" Tag="3" Content="3"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="br" Tag="5" Content="5"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="br" Tag="8" Content="8" IsChecked="True"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="br" Tag="12" Content="12"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="br" Tag="20" Content="20"/>
+        </WrapPanel>
+
+        <TextBlock Text="Largeur maximale" Foreground="{StaticResource Muted}" Margin="0,4,0,6"/>
+        <WrapPanel x:Name="WidthPanel">
+          <RadioButton Style="{StaticResource Seg}" GroupName="w" Tag="0" Content="Native" IsChecked="True"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="w" Tag="2560" Content="2560"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="w" Tag="1920" Content="1920"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="w" Tag="1280" Content="1280"/>
+        </WrapPanel>
+
+        <TextBlock Text="Encodeur" Foreground="{StaticResource Muted}" Margin="0,4,0,6"/>
+        <WrapPanel x:Name="EncoderPanel">
+          <RadioButton Style="{StaticResource Seg}" GroupName="enc" Tag="auto" Content="Auto" IsChecked="True"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="enc" Tag="h264_nvenc" Content="NVIDIA"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="enc" Tag="h264_qsv" Content="Intel"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="enc" Tag="h264_amf" Content="AMD"/>
+          <RadioButton Style="{StaticResource Seg}" GroupName="enc" Tag="libx264" Content="Processeur"/>
+        </WrapPanel>
+      </StackPanel>
+
+      <Border Grid.Column="1" Background="{StaticResource Card}" BorderBrush="{StaticResource Blue}"
+              BorderThickness="2" CornerRadius="12" Padding="16" VerticalAlignment="Top">
+        <StackPanel>
+          <TextBlock Text="🔌 Connexion par câble USB" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
+          <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"
+                     Text="1. Débogage USB activé sur la tablette&#10;2. Branche le câble, accepte la fenêtre&#10;3. Clique sur Démarrer&#10;4. Ouvre l'app Second écran (ou Chrome à l'adresse ci-dessous)"/>
+          <TextBox x:Name="UrlBox" Style="{StaticResource Box}" IsReadOnly="True" Text="http://127.0.0.1:5555"/>
+          <TextBlock Text="Port" Foreground="{StaticResource Muted}" Margin="0,12,0,4"/>
+          <TextBox x:Name="PortBox" Style="{StaticResource Box}" Text="5555" Width="100" HorizontalAlignment="Left"
+                   TextChanged="PortBox_TextChanged"/>
+          <Button Style="{StaticResource Ghost}" Content="🔌 Rebrancher le câble" Margin="0,14,0,0"
+                  Click="Rebrancher_Click"/>
+        </StackPanel>
+      </Border>
+    </Grid>
+
+    <!-- Bouton principal -->
+    <Button x:Name="StartBtn" Grid.Row="2" Style="{StaticResource Primary}" Content="▶  Démarrer"
+            Margin="0,8,0,14" Click="StartBtn_Click"/>
+
+    <!-- Journal -->
+    <TextBox x:Name="LogBox" Grid.Row="3" Style="{StaticResource Box}" IsReadOnly="True"
+             FontFamily="Consolas" FontSize="13" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+             AcceptsReturn="True"/>
+  </Grid>
+</Window>

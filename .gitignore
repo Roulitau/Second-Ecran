@@ -2,3 +2,6 @@ pc/build/
 pc/dist/
 *.spec
 __pycache__/
+bin/
+obj/
+publish/

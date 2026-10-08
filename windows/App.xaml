@@ -1,0 +1,98 @@
+<Application x:Class="SecondEcran.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml">
+  <Application.Resources>
+
+    <!-- Palette accessible : bleu / ambre / blanc sur fond sombre, jamais rouge/vert seuls -->
+    <SolidColorBrush x:Key="Bg" Color="#0B0F14"/>
+    <SolidColorBrush x:Key="Card" Color="#121923"/>
+    <SolidColorBrush x:Key="Fg" Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="Muted" Color="#AEB9C5"/>
+    <SolidColorBrush x:Key="Blue" Color="#5AAEFF"/>
+    <SolidColorBrush x:Key="Amber" Color="#FFBF00"/>
+
+    <!-- Choix (une seule option cochée) : coche ✓ en plus de la couleur -->
+    <Style x:Key="Seg" TargetType="RadioButton">
+      <Setter Property="Foreground" Value="{StaticResource Fg}"/>
+      <Setter Property="FontSize" Value="14"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="RadioButton">
+            <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Fg}"
+                    BorderThickness="2" CornerRadius="6" Padding="12,6" Margin="0,0,8,8" Cursor="Hand">
+              <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="Tick" Text="✓ " FontWeight="Bold" Visibility="Collapsed"/>
+                <ContentPresenter VerticalAlignment="Center"/>
+              </StackPanel>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Amber}"/>
+              </Trigger>
+              <Trigger Property="IsChecked" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="{StaticResource Blue}"/>
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Blue}"/>
+                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
+                <Setter Property="Foreground" Value="#000000"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Gros bouton principal -->
+    <Style x:Key="Primary" TargetType="Button">
+      <Setter Property="Foreground" Value="#000000"/>
+      <Setter Property="FontSize" Value="20"/>
+      <Setter Property="FontWeight" Value="SemiBold"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="{StaticResource Amber}" CornerRadius="10" Padding="20,12" Cursor="Hand">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="Background" Value="#FFD966"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <!-- Bouton secondaire -->
+    <Style x:Key="Ghost" TargetType="Button">
+      <Setter Property="Foreground" Value="{StaticResource Fg}"/>
+      <Setter Property="FontSize" Value="15"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Fg}" BorderThickness="2"
+                    CornerRadius="8" Padding="14,8" Cursor="Hand">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Amber}"/>
+              </Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+
+    <Style x:Key="Box" TargetType="TextBox">
+      <Setter Property="Background" Value="#0E141C"/>
+      <Setter Property="Foreground" Value="{StaticResource Fg}"/>
+      <Setter Property="CaretBrush" Value="{StaticResource Fg}"/>
+      <Setter Property="BorderBrush" Value="{StaticResource Muted}"/>
+      <Setter Property="BorderThickness" Value="2"/>
+      <Setter Property="Padding" Value="8,6"/>
+      <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+  </Application.Resources>
+</Application>

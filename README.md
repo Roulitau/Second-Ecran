@@ -9,13 +9,14 @@ android/  projet Android Studio (app optionnelle, même protocole)
 ```
 
 ## Fabriquer l'exe et l'APK (GitHub Actions)
-Le dépôt contient `.github/workflows/build.yml` : à chaque `git push`, GitHub compile
-- **SecondEcran-Windows** : `SecondEcran.exe` + ffmpeg + adb dans un dossier (rien à installer),
+À chaque `git push`, GitHub compile (onglet **Actions** → dernier run → *Artifacts* en bas de page) :
+- **SecondEcran-Windows** : `SecondEcran.exe` (C#/.NET 8, aucun Python) + ffmpeg + adb dans le même dossier. Rien à installer.
 - **SecondEcran-Android-apk** : `app-debug.apk` à installer sur la tablette.
-Onglet **Actions** du dépôt → dernier run → *Artifacts* en bas. (Windows peut afficher « SmartScreen » :
-Informations complémentaires → Exécuter quand même, l'exe n'est pas signé.)
+Windows peut afficher « SmartScreen » : Informations complémentaires → Exécuter quand même (exe non signé).
 
-## Installation (une fois, si tu utilises le .py)
+Code : `windows/` (exe C#), `android/` (app), `pc/` (ancienne version Python + faux clients de test).
+
+## Installation (seulement pour la version Python `pc/`)
 1. Python 3.10+ (python.org). 2. `winget install Gyan.FFmpeg`. 3. `winget install Google.PlatformTools` (adb).
 Rouvre le terminal ensuite. Tablette : Options pour les développeurs → **Débogage USB**.
 
