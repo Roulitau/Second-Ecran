@@ -1,7 +1,10 @@
 # Second écran USB (PC Windows → tablette Android)
 
 Le PC capture un écran avec ffmpeg et l'envoie à la tablette **par le câble USB** (`adb reverse`).
-Le serveur n'écoute qu'en local (`127.0.0.1`) : rien n'est exposé sur le Wi-Fi, pas de code d'accès à gérer.
+Deux façons de relier la tablette, toutes deux par le câble :
+- **Partage de connexion USB (recommandé, sans débogage)** : tablette → Paramètres → Partage de connexion → *Partage par USB*. Le PC reçoit une adresse du câble, l'app la trouve toute seule.
+- `adb reverse` (si le débogage USB est activé) : marche aussi, essayé automatiquement.
+Le serveur n'accepte que les adresses privées (câble, réseau maison), jamais Internet.
 
 ```
 pc/       secondscreen.py (serveur + interface), webpage.py (page web), test_*.py, build_exe.bat
@@ -18,10 +21,10 @@ Code : `windows/` (exe C#), `android/` (app), `pc/` (ancienne version Python + f
 
 ## Installation (seulement pour la version Python `pc/`)
 1. Python 3.10+ (python.org). 2. `winget install Gyan.FFmpeg`. 3. `winget install Google.PlatformTools` (adb).
-Rouvre le terminal ensuite. Tablette : Options pour les développeurs → **Débogage USB**.
+Rouvre le terminal ensuite. (Le débogage USB est facultatif.)
 
 ## Utilisation
-1. Branche le câble (câble « données », pas seulement charge), accepte la fenêtre sur la tablette.
+1. Branche le câble (câble « données »), active **Partage par USB** sur la tablette (pas de débogage nécessaire).
 2. `cd pc` puis `python secondscreen.py` → **▶ Démarrer** (il lance `adb reverse` tout seul).
 3. Tablette, Chrome : `http://127.0.0.1:5555`, puis **⛶ Plein écran**.
 Débranché/rebranché : bouton **🔌 Rebrancher le câble**.

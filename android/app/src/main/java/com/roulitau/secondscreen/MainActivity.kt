@@ -24,7 +24,7 @@ class MainActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private var retry: Runnable? = null
     private var resumeStream = false
-    private var lastHost = "127.0.0.1"
+    private var lastHost = "auto"
     private var lastPort = 5555
     private var lastPin = ""
 
@@ -33,8 +33,8 @@ class MainActivity : Activity() {
         prefs = getSharedPreferences("cfg", MODE_PRIVATE)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         hideSystemUi()
-        // Mode USB : connexion automatique au PC via `adb reverse` (127.0.0.1)
-        showStream(prefs.getString("ip", "127.0.0.1") ?: "127.0.0.1",
+        // Connexion automatique : PC trouvé tout seul (partage de connexion USB ou adb reverse)
+        showStream(prefs.getString("ip", "auto") ?: "auto",
             prefs.getString("port", "5555")?.toIntOrNull() ?: 5555,
             prefs.getString("pin", "") ?: "")
     }
@@ -79,8 +79,8 @@ class MainActivity : Activity() {
             gravity = Gravity.CENTER
         }
         val ip = EditText(this).apply {
-            hint = "Adresse (USB : 127.0.0.1)"
-            setText(prefs.getString("ip", "127.0.0.1"))
+            hint = "Adresse du PC (auto = recherche seule)"
+            setText(prefs.getString("ip", "auto"))
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
             setTextColor(Color.WHITE)
             setHintTextColor(Color.LTGRAY)
@@ -142,9 +142,44 @@ class MainActivity : Activity() {
         retry = null
     }
 
+    private fun isAuto(h: String) = h.isEmpty() || h == "auto" || h == "127.0.0.1"
+
     private fun showStream(host: String, port: Int, pin: String) {
+        if (isAuto(host)) { searchThenStream(port, pin); return }
+        startStream(host, port, pin, host)
+    }
+
+    private fun searchThenStream(port: Int, pin: String) {
         cancelRetry()
-        lastHost = host; lastPort = port; lastPin = pin
+        lastHost = "auto"; lastPort = port; lastPin = pin
+        resumeStream = true
+        streamView?.disconnect(); streamView = null
+        val wait = TextView(this).apply {
+            text = "🔎 Recherche du PC…\n(câble branché, Partage par USB activé, serveur démarré)"
+            setTextColor(Color.rgb(255, 191, 0))
+            textSize = 20f
+            gravity = Gravity.CENTER
+            setBackgroundColor(Color.BLACK)
+        }
+        setContentView(wait)
+        Thread {
+            val found = try { Discovery.find(port) } catch (e: Exception) { null }
+            handler.post {
+                if (!resumeStream || lastHost != "auto") return@post
+                if (found != null) startStream(found, port, pin, "auto")
+                else {
+                    wait.text = "⚠ PC introuvable\n⏳ Nouvelle recherche…"
+                    val r = Runnable { searchThenStream(port, pin) }
+                    retry = r
+                    handler.postDelayed(r, 2000)
+                }
+            }
+        }.start()
+    }
+
+    private fun startStream(host: String, port: Int, pin: String, remember: String) {
+        cancelRetry()
+        lastHost = remember; lastPort = port; lastPin = pin
         resumeStream = true
         val container = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
         val wait = TextView(this).apply {
@@ -157,7 +192,7 @@ class MainActivity : Activity() {
             // PC en veille, câble débranché, serveur arrêté... : on réessaie tout seul
             wait.text = "⚠ $reason\n⏳ Nouvelle tentative…"
             wait.visibility = View.VISIBLE
-            val r = Runnable { showStream(host, port, pin) }
+            val r = Runnable { showStream(remember, port, pin) }
             retry = r
             handler.postDelayed(r, 2000)
         }

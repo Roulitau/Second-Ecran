@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        PortBox_TextChanged(this, null!);
         BuildScreens();
         Closing += (_, _) => _server?.Stop();
         Append("Prêt. Clique sur Démarrer.");
@@ -64,7 +65,12 @@ public partial class MainWindow : Window
 
     void PortBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        if (UrlBox != null && PortBox != null) UrlBox.Text = $"http://127.0.0.1:{Port}";
+        if (UrlBox != null && PortBox != null)
+        {
+            var ips = ScreenServer.LocalAddresses();
+            UrlBox.Text = ips.Count == 0 ? $"http://127.0.0.1:{Port}"
+                : string.Join("   ", ips.Select(a => $"{a}:{Port}"));
+        }
     }
 
     // ---- écran virtuel ---------------------------------------------------------------------
@@ -147,7 +153,8 @@ public partial class MainWindow : Window
     async void Rebrancher_Click(object sender, RoutedEventArgs e)
     {
         int port = Port;
+        PortBox_TextChanged(this, null!);
         var (ok, msg) = await Task.Run(() => Tools.AdbReverse(port));
-        Append((ok ? "✓ " : "⚠ ") + msg);
+        Append(ok ? "✓ " + msg : "ℹ Débogage USB non utilisé. Adresses du PC : " + UrlBox.Text);
     }
 }

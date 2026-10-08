@@ -22,8 +22,8 @@ public sealed class ServerConfig
 }
 
 /// <summary>
-/// Capture un écran avec ffmpeg et l'envoie à la tablette, uniquement sur 127.0.0.1
-/// (le câble USB amène la tablette ici via `adb reverse`) :
+/// Capture un écran avec ffmpeg et l'envoie à la tablette, sur les réseaux privés
+/// (câble USB : partage de connexion USB de la tablette, ou `adb reverse` si le débogage est actif) :
 ///  - app Android : protocole binaire [type:1][longueur:4][charge] avec H.264,
 ///  - navigateur : page web + WebSocket (H.264 WebCodecs, ou JPEG en secours).
 /// </summary>
@@ -107,14 +107,15 @@ public sealed class ScreenServer
             _input = new MouseInput(_mon, Say);
             _page = LoadPage();
 
-            _listener = new TcpListener(IPAddress.Loopback, _cfg.Port);
+            _listener = new TcpListener(IPAddress.Any, _cfg.Port);
             try { _listener.Start(5); }
             catch (SocketException e)
             {
                 Say($"⚠ Port {_cfg.Port} indisponible ({e.Message}).");
                 return;
             }
-            Say($"En attente sur 127.0.0.1:{_cfg.Port} (mode USB).");
+            Say($"En attente sur le port {_cfg.Port} (câble USB, réseau privé uniquement).");
+            foreach (var a in LocalAddresses()) Say($"  Adresse du PC : {a}:{_cfg.Port}");
             if (OperatingSystem.IsWindows())
             {
                 // le PC ne se met pas en veille tant que le serveur tourne (la capture s'arrêterait)
@@ -124,7 +125,7 @@ public sealed class ScreenServer
             if (!_cfg.TestSource)
             {
                 var (ok, msg) = Tools.AdbReverse(_cfg.Port);
-                Say((ok ? "✓ " : "⚠ ") + msg);
+                Say(ok ? "✓ " + msg : "ℹ Débogage USB non utilisé (partage de connexion USB OK).");
                 new Thread(() => KeepUsbAlive(ok)) { IsBackground = true, Name = "usb" }.Start();
             }
 
@@ -133,6 +134,7 @@ public sealed class ScreenServer
                 TcpClient c;
                 try { c = _listener.AcceptTcpClient(); }
                 catch { break; }
+                if (!IsPrivate(c.Client.RemoteEndPoint as IPEndPoint)) { try { c.Close(); } catch { } continue; }
                 new Thread(() => HandleConn(c)) { IsBackground = true }.Start();
             }
         }
@@ -162,10 +164,40 @@ public sealed class ScreenServer
             var (ok, _) = Tools.AdbReverse(_cfg.Port);
             if (ok != lastOk)
             {
-                Say(ok ? "✓ Câble USB reconnecté." : "⚠ Câble USB perdu : en attente de la tablette…");
+                if (ok) Say("✓ Câble USB reconnecté (débogage).");
                 lastOk = ok;
             }
         }
+    }
+
+    /// <summary>Seuls le PC lui-même et les réseaux privés (câble/partage, Wi-Fi maison) sont acceptés.</summary>
+    static bool IsPrivate(IPEndPoint? ep)
+    {
+        if (ep == null) return false;
+        var ip = ep.Address;
+        if (ip.IsIPv4MappedToIPv6) ip = ip.MapToIPv4();
+        if (IPAddress.IsLoopback(ip)) return true;
+        if (ip.AddressFamily != AddressFamily.InterNetwork) return false;
+        var b = ip.GetAddressBytes();
+        return b[0] == 10 || (b[0] == 172 && b[1] >= 16 && b[1] <= 31)
+            || (b[0] == 192 && b[1] == 168) || (b[0] == 169 && b[1] == 254);
+    }
+
+    public static List<string> LocalAddresses()
+    {
+        var r = new List<string>();
+        try
+        {
+            foreach (var n in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (n.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up) continue;
+                foreach (var u in n.GetIPProperties().UnicastAddresses)
+                    if (u.Address.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(u.Address))
+                        r.Add(u.Address.ToString());
+            }
+        }
+        catch { }
+        return r;
     }
 
     static byte[] LoadPage()

@@ -70,8 +70,8 @@
         <StackPanel>
           <TextBlock Text="🔌 Connexion par câble USB" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
           <TextBlock TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"
-                     Text="1. Débogage USB activé sur la tablette&#10;2. Branche le câble, accepte la fenêtre&#10;3. Clique sur Démarrer&#10;4. Ouvre l'app Second écran (ou Chrome à l'adresse ci-dessous)"/>
-          <TextBox x:Name="UrlBox" Style="{StaticResource Box}" IsReadOnly="True" Text="http://127.0.0.1:5555"/>
+                     Text="1. Branche le câble USB&#10;2. Tablette : Paramètres → Partage de connexion → Partage par USB (aucun débogage)&#10;3. Clique sur Démarrer&#10;4. Ouvre l'app Second écran : elle trouve le PC toute seule (ou tape l'adresse ci-dessous)"/>
+          <TextBox x:Name="UrlBox" Style="{StaticResource Box}" IsReadOnly="True" Text="…"/>
           <TextBlock Text="Port" Foreground="{StaticResource Muted}" Margin="0,12,0,4"/>
           <TextBox x:Name="PortBox" Style="{StaticResource Box}" Text="5555" Width="100" HorizontalAlignment="Left"
                    TextChanged="PortBox_TextChanged"/>
