@@ -1,0 +1,4 @@
+pc/build/
+pc/dist/
+*.spec
+__pycache__/

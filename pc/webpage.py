@@ -1,0 +1,288 @@
+# Page web servie par le PC à l'adresse http://127.0.0.1:<port>/ (via `adb reverse`, câble USB).
+# Reçoit de l'H.264 (WebCodecs, 127.0.0.1 est un contexte sécurisé) ou, à défaut, du JPEG
+# par WebSocket, le dessine sur un canvas, renvoie les gestes.
+
+INDEX_HTML = r"""<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#000000">
+<title>Second écran</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden;
+               font-family: system-ui, sans-serif; overscroll-behavior: none; }
+  #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+           touch-action: none; user-select: none; -webkit-user-select: none; }
+  canvas { display: block; background: #000; touch-action: none; }
+  #msg { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); display: none;
+         background: #000; color: #FFBF00; border: 2px solid #FFBF00; border-radius: 8px;
+         padding: 8px 16px; font-size: 18px; z-index: 5; text-align: center; max-width: 90vw; }
+  #msg.ok { color: #7FB8FF; border-color: #7FB8FF; }
+  #fs { position: fixed; top: 12px; right: 12px; z-index: 4; background: #000; color: #fff;
+        border: 2px solid #fff; border-radius: 8px; font-size: 18px; padding: 8px 14px; opacity: .75; }
+  #pinbox { position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+            flex-direction: column; gap: 14px; background: #000; z-index: 6; color: #fff; }
+  #pinbox input { font-size: 28px; width: 220px; text-align: center; padding: 8px;
+                  background: #000; color: #fff; border: 2px solid #fff; border-radius: 8px; }
+  #pinbox button { font-size: 22px; padding: 10px 28px; background: #000; color: #FFBF00;
+                   border: 2px solid #FFBF00; border-radius: 8px; }
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="c" width="16" height="9"></canvas></div>
+<div id="msg"></div>
+<button id="fs" type="button">⛶ Plein écran</button>
+<form id="pinbox">
+  <div style="font-size:22px">🔒 Code d'accès</div>
+  <input id="pin" type="password" inputmode="numeric" autocomplete="off">
+  <button type="submit">▶ Valider</button>
+</form>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const canvas = $('c'), ctx = canvas.getContext('2d');
+  const msg = $('msg'), fsBtn = $('fs'), pinBox = $('pinbox'), pinIn = $('pin');
+  let ws = null, vw = 0, vh = 0, retry = null, lastError = null, needCode = false;
+  let latest = null, drawing = false;
+  // H.264 (WebCodecs) si le navigateur sait ; sinon / en cas d'échec : JPEG
+  let fmt = (window.VideoDecoder && window.EncodedVideoChunk && window.isSecureContext &&
+             sessionStorage.getItem('fmt') !== 'jpeg') ? 'h264' : 'jpeg';
+  let dec = null, needKey = true, ts = 0, frameOut = null, rafOn = false, firstKeyAt = 0, gotFrame = false;
+  function fallbackJpeg(why) {
+    try { sessionStorage.setItem('fmt', 'jpeg'); } catch (e) {}
+    try { if (dec) dec.close(); } catch (e) {}
+    dec = null; fmt = 'jpeg';
+    say('ℹ H.264 indisponible (' + why + ') : passage en JPEG');
+    try { ws.close(); } catch (e) {}
+  }
+  function codecFrom(au) {      // "avc1.PPCCLL" lu dans le SPS (NAL type 7)
+    for (let i = 0; i + 6 < au.length; i++) {
+      if (au[i] === 0 && au[i + 1] === 0 && au[i + 2] === 1 && (au[i + 3] & 31) === 7) {
+        const h = n => n.toString(16).padStart(2, '0');
+        return 'avc1.' + h(au[i + 4]) + h(au[i + 5]) + h(au[i + 6]);
+      }
+    }
+    return null;
+  }
+  function showFrame() {
+    rafOn = false;
+    if (!frameOut) return;
+    const f = frameOut; frameOut = null;
+    ctx.drawImage(f, 0, 0, canvas.width, canvas.height);
+    f.close();
+  }
+  function onH264(buf) {
+    const v = new Uint8Array(buf), key = v[0] === 1, au = v.subarray(1);
+    if (!dec) {
+      if (!key) return;
+      const codec = codecFrom(au);
+      if (!codec) return;
+      try {
+        dec = new VideoDecoder({
+          output: f => {
+            gotFrame = true;
+            if (frameOut) frameOut.close();
+            frameOut = f;
+            if (!rafOn) { rafOn = true; requestAnimationFrame(showFrame); }
+          },
+          error: e => fallbackJpeg(String(e.message || e)),
+        });
+        dec.configure({ codec: codec, optimizeForLatency: true });
+      } catch (e) { return fallbackJpeg(String(e.message || e)); }
+      needKey = true; firstKeyAt = performance.now(); gotFrame = false;
+      setTimeout(() => { if (dec && !gotFrame) fallbackJpeg('aucune image décodée'); }, 4000);
+    }
+    if (needKey && !key) return;
+    if (dec.decodeQueueSize > 4 && !key) { needKey = true; return; }   // en retard : on attend une image clé
+    needKey = false;
+    try {
+      dec.decode(new EncodedVideoChunk({ type: key ? 'key' : 'delta', timestamp: (ts += 16667), data: au }));
+    } catch (e) { fallbackJpeg(String(e.message || e)); }
+  }
+  let pin = new URLSearchParams(location.search).get('code') || sessionStorage.getItem('code') || '';
+
+  function say(text, kind) {
+    msg.textContent = text || '';
+    msg.className = kind || '';
+    msg.style.display = text ? 'block' : 'none';
+  }
+
+  function fit() {
+    if (!vw) return;
+    const s = Math.min(innerWidth / vw, innerHeight / vh);
+    canvas.style.width = Math.floor(vw * s) + 'px';
+    canvas.style.height = Math.floor(vh * s) + 'px';
+  }
+  addEventListener('resize', fit);
+
+  // ---- Connexion ----------------------------------------------------------------------
+  function connect() {
+    clearTimeout(retry);
+    lastError = null;
+    needCode = false;
+    say('⏳ Connexion…');
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(proto + '://' + location.host + '/ws?fmt=' + fmt + '&code=' + encodeURIComponent(pin));
+    ws.binaryType = 'arraybuffer';
+    ws.onopen = () => {
+      send({ a: 'hello', w: Math.round(screen.width * devicePixelRatio),
+             h: Math.round(screen.height * devicePixelRatio) });
+    };
+    ws.onmessage = ev => {
+      if (typeof ev.data === 'string') {
+        const m = JSON.parse(ev.data);
+        if (m.error) {
+          lastError = m.error;
+          if (m.needCode) { needCode = true; pinBox.style.display = 'flex'; pinIn.focus(); }
+          say('⚠ ' + m.error, 'warn');
+          return;
+        }
+        if (dec) { try { dec.close(); } catch (e) {} dec = null; }
+        needKey = true;
+        if (m.fmt) fmt = m.fmt;
+        vw = m.w; vh = m.h;
+        canvas.width = vw; canvas.height = vh;
+        fit();
+        say('✓ Connecté', 'ok');
+        setTimeout(() => { if (msg.textContent === '✓ Connecté') say(''); }, 1500);
+        return;
+      }
+      if (fmt === 'h264') { onH264(ev.data); return; }
+      latest = ev.data;
+      if (!drawing) drawLoop();
+    };
+    ws.onclose = () => {
+      if (needCode) return;
+      say('⚠ ' + (lastError || 'Déconnecté') + ' — nouvelle tentative…', 'warn');
+      retry = setTimeout(connect, 2500);
+    };
+    ws.onerror = () => { try { ws.close(); } catch (e) {} };
+  }
+
+  pinBox.addEventListener('submit', e => {
+    e.preventDefault();
+    pin = pinIn.value;
+    try { sessionStorage.setItem('code', pin); } catch (err) {}
+    pinBox.style.display = 'none';
+    connect();
+  });
+
+  // ---- Affichage (on ne dessine que la dernière image reçue) ---------------------------
+  async function drawLoop() {
+    drawing = true;
+    try {
+      while (latest) {
+        const data = latest;
+        latest = null;
+        const bmp = await createImageBitmap(new Blob([data], { type: 'image/jpeg' }));
+        ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+        bmp.close();
+      }
+    } catch (e) {}
+    drawing = false;
+  }
+
+  // ---- Gestes -> souris -----------------------------------------------------------------
+  // toucher = clic gauche, glisser = maintenir + déplacer, appui long = clic droit,
+  // deux doigts = défilement
+  const SLOP = 10, LONG_MS = 450;
+  let downX = 0, downY = 0, lastX = 0, lastY = 0, lastCY = 0;
+  let dragging = false, longFired = false, multi = false, lpTimer = null;
+
+  function send(o) {
+    if (ws && ws.readyState === 1) ws.send(JSON.stringify(o));
+  }
+  function norm(x, y) {
+    const r = canvas.getBoundingClientRect();
+    return {
+      x: Math.min(1, Math.max(0, (x - r.left) / r.width)),
+      y: Math.min(1, Math.max(0, (y - r.top) / r.height)),
+    };
+  }
+  function sendPos(a, x, y) { const n = norm(x, y); send({ a: a, x: n.x, y: n.y }); }
+  function centroidY(touches) {
+    let s = 0;
+    for (const t of touches) s += t.clientY;
+    return touches.length ? s / touches.length : 0;
+  }
+  function resetGesture() { dragging = false; longFired = false; multi = false; clearTimeout(lpTimer); }
+
+  canvas.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (e.touches.length === 1) {
+      const t = e.touches[0];
+      downX = lastX = t.clientX; downY = lastY = t.clientY;
+      dragging = false; longFired = false; multi = false;
+      clearTimeout(lpTimer);
+      lpTimer = setTimeout(() => {
+        if (!dragging && !multi) {
+          longFired = true;
+          if (navigator.vibrate) navigator.vibrate(30);
+          sendPos('rclick', downX, downY);
+        }
+      }, LONG_MS);
+    } else {
+      clearTimeout(lpTimer);
+      if (dragging) { sendPos('up', lastX, lastY); dragging = false; }
+      multi = true;
+      lastCY = centroidY(e.touches);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (multi) {
+      const cy = centroidY(e.touches);
+      const dy = cy - lastCY;
+      if (dy !== 0) send({ a: 'scroll', dy: dy / canvas.getBoundingClientRect().height });
+      lastCY = cy;
+    } else if (!longFired && e.touches.length === 1) {
+      const t = e.touches[0];
+      lastX = t.clientX; lastY = t.clientY;
+      if (!dragging && Math.hypot(lastX - downX, lastY - downY) > SLOP) {
+        clearTimeout(lpTimer);
+        sendPos('down', downX, downY);
+        dragging = true;
+      }
+      if (dragging) sendPos('move', lastX, lastY);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', e => {
+    e.preventDefault();
+    if (e.touches.length === 0) {
+      clearTimeout(lpTimer);
+      if (!multi && !longFired) {
+        if (dragging) sendPos('up', lastX, lastY);
+        else sendPos('click', lastX, lastY);
+      }
+      resetGesture();
+    } else if (multi) {
+      lastCY = centroidY(e.touches);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchcancel', e => {
+    e.preventDefault();
+    if (dragging) sendPos('up', lastX, lastY);
+    resetGesture();
+  }, { passive: false });
+
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // ---- Plein écran ----------------------------------------------------------------------
+  const root = document.documentElement;
+  if (!root.requestFullscreen) fsBtn.style.display = 'none';
+  fsBtn.addEventListener('click', () => { root.requestFullscreen().catch(() => {}); });
+  document.addEventListener('fullscreenchange', () => {
+    fsBtn.style.display = document.fullscreenElement ? 'none' : (root.requestFullscreen ? 'block' : 'none');
+  });
+
+  connect();
+})();
+</script>
+</body>
+</html>
+"""
