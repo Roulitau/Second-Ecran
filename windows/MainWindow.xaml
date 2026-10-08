@@ -1,7 +1,7 @@
 <Window x:Class="SecondEcran.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Second écran" Width="900" Height="760" MinWidth="760" MinHeight="620"
+        Title="Second écran" Width="900" Height="820" MinWidth="760" MinHeight="620"
         Background="{StaticResource Bg}" Foreground="{StaticResource Fg}"
         FontFamily="Segoe UI" WindowStartupLocation="CenterScreen">
   <Grid Margin="24">
@@ -63,7 +63,9 @@
         </WrapPanel>
       </StackPanel>
 
-      <Border Grid.Column="1" Background="{StaticResource Card}" BorderBrush="{StaticResource Blue}"
+
+      <StackPanel Grid.Column="1" VerticalAlignment="Top">
+      <Border Background="{StaticResource Card}" BorderBrush="{StaticResource Blue}"
               BorderThickness="2" CornerRadius="12" Padding="16" VerticalAlignment="Top">
         <StackPanel>
           <TextBlock Text="🔌 Connexion par câble USB" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,10"/>
@@ -77,6 +79,18 @@
                   Click="Rebrancher_Click"/>
         </StackPanel>
       </Border>
+
+        <Border Background="{StaticResource Card}" BorderBrush="{StaticResource Amber}"
+                BorderThickness="2" CornerRadius="12" Padding="16" Margin="0,14,0,0">
+          <StackPanel>
+            <TextBlock Text="🖥 Écran virtuel" FontSize="17" FontWeight="SemiBold" Margin="0,0,0,8"/>
+            <TextBlock x:Name="VdStatus" Text="… vérification" Foreground="{StaticResource Muted}" Margin="0,0,0,10"
+                       TextWrapping="Wrap"/>
+            <Button x:Name="VdBtn" Style="{StaticResource Ghost}" Content="…" IsEnabled="False"
+                    Click="VdBtn_Click"/>
+          </StackPanel>
+        </Border>
+      </StackPanel>
     </Grid>
 
     <!-- Bouton principal -->

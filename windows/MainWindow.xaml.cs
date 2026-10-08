@@ -7,11 +7,23 @@ namespace SecondEcran;
 public partial class MainWindow : Window
 {
     ScreenServer? _server;
-    readonly List<MonitorInfo> _mons = Monitors.List();
+    List<MonitorInfo> _mons = new();
+    VirtualDisplayState _vd = new(false, false, "", "");
 
     public MainWindow()
     {
         InitializeComponent();
+        BuildScreens();
+        Closing += (_, _) => _server?.Stop();
+        Append("Prêt. Clique sur Démarrer.");
+        _ = RefreshVirtualDisplay();
+    }
+
+    /// <summary>(Re)crée la liste des écrans à envoyer.</summary>
+    void BuildScreens()
+    {
+        _mons = Monitors.List();
+        ScreensPanel.Children.Clear();
         var def = Monitors.DefaultIndex(_mons);
         for (int i = 0; i < _mons.Count; i++)
         {
@@ -25,8 +37,6 @@ public partial class MainWindow : Window
             };
             ScreensPanel.Children.Add(rb);
         }
-        Closing += (_, _) => _server?.Stop();
-        Append("Prêt. Clique sur Démarrer.");
     }
 
     static string Selected(Panel panel, string fallback)
@@ -57,6 +67,53 @@ public partial class MainWindow : Window
         if (UrlBox != null && PortBox != null) UrlBox.Text = $"http://127.0.0.1:{Port}";
     }
 
+    // ---- écran virtuel ---------------------------------------------------------------------
+    async Task RefreshVirtualDisplay()
+    {
+        _vd = await Task.Run(VirtualDisplay.Query);
+        if (!_vd.Installed)
+        {
+            VdStatus.Text = "⚠ Non installé";
+            VdStatus.Foreground = (Brush)FindResource("Amber");
+            VdBtn.Content = "Comment l'installer ?";
+        }
+        else if (_vd.Enabled)
+        {
+            VdStatus.Text = "● Activé ✓";
+            VdStatus.Foreground = (Brush)FindResource("Blue");
+            VdBtn.Content = "Désactiver l'écran virtuel";
+        }
+        else
+        {
+            VdStatus.Text = "■ Désactivé ✕";
+            VdStatus.Foreground = (Brush)FindResource("Muted");
+            VdBtn.Content = "Activer l'écran virtuel";
+        }
+        VdBtn.IsEnabled = true;
+    }
+
+    async void VdBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_vd.Installed)
+        {
+            Append("Écran virtuel non installé. Dans PowerShell : winget install --id=VirtualDrivers.Virtual-Display-Driver -e");
+            Append("Puis rouvre cette application.");
+            return;
+        }
+        bool target = !_vd.Enabled;
+        VdBtn.IsEnabled = false;
+        VdStatus.Text = "… autorisation administrateur demandée";
+        var id = _vd.InstanceId;
+        var (ok, msg) = await Task.Run(() => VirtualDisplay.Set(id, target));
+        Append((ok ? "✓ " : "⚠ ") + msg);
+        if (ok) await Task.Delay(2500);        // Windows met un instant à ajouter / retirer l'écran
+        await RefreshVirtualDisplay();
+        BuildScreens();
+        if (ok && _server != null)
+            Append("⚠ La liste des écrans a changé : clique sur Arrêter puis Démarrer.");
+    }
+
+    // ---- serveur ---------------------------------------------------------------------------
     void StartBtn_Click(object sender, RoutedEventArgs e)
     {
         if (_server != null)
