@@ -115,10 +115,17 @@ public sealed class ScreenServer
                 return;
             }
             Say($"En attente sur 127.0.0.1:{_cfg.Port} (mode USB).");
+            if (OperatingSystem.IsWindows())
+            {
+                // le PC ne se met pas en veille tant que le serveur tourne (la capture s'arrêterait)
+                Native.SetThreadExecutionState(0x80000000u | 0x00000001u);
+                Say("PC maintenu éveillé tant que le serveur tourne.");
+            }
             if (!_cfg.TestSource)
             {
                 var (ok, msg) = Tools.AdbReverse(_cfg.Port);
                 Say((ok ? "✓ " : "⚠ ") + msg);
+                new Thread(() => KeepUsbAlive(ok)) { IsBackground = true, Name = "usb" }.Start();
             }
 
             while (!_stop)
@@ -135,9 +142,29 @@ public sealed class ScreenServer
         }
         finally
         {
+            if (OperatingSystem.IsWindows()) Native.SetThreadExecutionState(0x80000000u);
             try { _listener?.Stop(); } catch { }
             Say("Serveur arrêté.");
             Stopped?.Invoke();
+        }
+    }
+
+    /// <summary>
+    /// Après une veille du PC ou un câble rebranché, `adb reverse` est perdu : on le remet
+    /// tout seul toutes les 4 s, en ne signalant que les changements d'état.
+    /// </summary>
+    void KeepUsbAlive(bool lastOk)
+    {
+        while (!_stop)
+        {
+            for (int i = 0; i < 8 && !_stop; i++) Thread.Sleep(500);
+            if (_stop) break;
+            var (ok, _) = Tools.AdbReverse(_cfg.Port);
+            if (ok != lastOk)
+            {
+                Say(ok ? "✓ Câble USB reconnecté." : "⚠ Câble USB perdu : en attente de la tablette…");
+                lastOk = ok;
+            }
         }
     }
 

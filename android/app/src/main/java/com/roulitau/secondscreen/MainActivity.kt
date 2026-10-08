@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.view.Gravity
 import android.view.View
@@ -19,6 +21,12 @@ class MainActivity : Activity() {
 
     private lateinit var prefs: SharedPreferences
     private var streamView: StreamView? = null
+    private val handler = Handler(Looper.getMainLooper())
+    private var retry: Runnable? = null
+    private var resumeStream = false
+    private var lastHost = "127.0.0.1"
+    private var lastPort = 5555
+    private var lastPin = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,6 +61,8 @@ class MainActivity : Activity() {
     // ---- Écran de connexion -----------------------------------------------------------
 
     private fun showConnect(message: String?) {
+        cancelRetry()
+        resumeStream = false
         streamView?.disconnect()
         streamView = null
 
@@ -127,10 +137,29 @@ class MainActivity : Activity() {
 
     // ---- Écran de streaming -----------------------------------------------------------
 
+    private fun cancelRetry() {
+        retry?.let { handler.removeCallbacks(it) }
+        retry = null
+    }
+
     private fun showStream(host: String, port: Int, pin: String) {
+        cancelRetry()
+        lastHost = host; lastPort = port; lastPin = pin
+        resumeStream = true
         val container = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
-        val sv = StreamView(this, host, port, pin) { reason ->
-            showConnect("⚠ $reason")
+        val wait = TextView(this).apply {
+            text = "⏳ Connexion au PC…\n(câble branché, serveur démarré)"
+            setTextColor(Color.rgb(255, 191, 0))
+            textSize = 20f
+            gravity = Gravity.CENTER
+        }
+        val sv = StreamView(this, host, port, pin, { wait.visibility = View.GONE }) { reason ->
+            // PC en veille, câble débranché, serveur arrêté... : on réessaie tout seul
+            wait.text = "⚠ $reason\n⏳ Nouvelle tentative…"
+            wait.visibility = View.VISIBLE
+            val r = Runnable { showStream(host, port, pin) }
+            retry = r
+            handler.postDelayed(r, 2000)
         }
         container.addView(
             sv,
@@ -140,6 +169,15 @@ class MainActivity : Activity() {
                 Gravity.CENTER
             )
         )
+        container.addView(
+            wait,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER
+            )
+        )
+        streamView?.disconnect()
         streamView = sv
         setContentView(container)
     }
@@ -151,6 +189,16 @@ class MainActivity : Activity() {
 
     override fun onStop() {
         super.onStop()
-        if (streamView != null) showConnect(null)
+        // appli en arrière-plan / tablette en veille : on coupe, et on reprend au retour
+        val wasStreaming = resumeStream && streamView != null
+        cancelRetry()
+        streamView?.disconnect()
+        streamView = null
+        resumeStream = wasStreaming
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (resumeStream && streamView == null) showStream(lastHost, lastPort, lastPin)
     }
 }

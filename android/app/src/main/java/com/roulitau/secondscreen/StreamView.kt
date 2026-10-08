@@ -21,6 +21,7 @@ class StreamView(
     private val host: String,
     private val port: Int,
     private val pin: String,
+    private val onConnected: () -> Unit,
     private val onClosed: (String) -> Unit
 ) : SurfaceView(context), SurfaceHolder.Callback {
 
@@ -62,6 +63,7 @@ class StreamView(
                     videoW = w
                     videoH = hh
                     requestLayout()
+                    onConnected()
                 }
             },
             onClosed = { reason -> ui.post { onClosed(reason) } }

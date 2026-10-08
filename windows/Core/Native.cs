@@ -20,6 +20,9 @@ internal static class Native
 
     public delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, ref RECT rect, IntPtr data);
 
+    [DllImport("kernel32.dll")]
+    public static extern uint SetThreadExecutionState(uint flags);
+
     [DllImport("user32.dll")]
     public static extern bool SetCursorPos(int x, int y);
 
